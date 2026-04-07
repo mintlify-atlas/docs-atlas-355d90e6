@@ -1,0 +1,296 @@
+---
+title: 'Hook handlers'
+description: 'All six MediaWiki hook handlers registered by the Wikisource extension, their services, conditions, and behaviour.'
+keywords: ['hooks', 'hook handlers', 'php', 'mediawiki hooks']
+---
+
+The extension registers six MediaWiki hooks in `extension.json`. Five are wired through the `HookHandlers` service-container mechanism (constructor injection), and one is registered as a static method reference directly in `Hooks`.
+
+```json
+// extension.json:22-29
+"Hooks": {
+    "SidebarBeforeOutput": "SidebarBeforeOutput",
+    "ArticleViewHeader": "ArticleViewHeader",
+    "EditPage::showEditForm:initial": "EditPageShowEditFormInitial",
+    "GetPreferences": "GetPreferences",
+    "BeforePageDisplay": "BeforePageDisplay",
+    "WikibaseClientSiteLinksForItem":
+        "MediaWiki\\Extension\\Wikisource\\WikibaseClientSiteLinksForItemHandler::provideSiteLinks"
+}
+```
+
+---
+
+## SidebarBeforeOutput
+
+**Class:** `MediaWiki\Extension\Wikisource\HookHandler\SidebarBeforeOutputHandler`
+**Interface:** `SidebarBeforeOutputHook`
+**File:** `includes/HookHandler/SidebarBeforeOutputHandler.php`
+
+**Services injected:**
+
+| Service | Type | Purpose |
+|---|---|---|
+| `MainConfig` | `Config` | Reads `WikisourceWsExportUrl` and `ServerName` |
+| `ContentLanguage` | `Language` | Passed to `WsExport` for language code detection |
+| `GadgetsRepo` | `GadgetRepo\|null` | Optional — checks whether conflicting gadgets are enabled |
+
+**When it fires:** On every page render, before the skin outputs the sidebar.
+
+**What it does:**
+
+Adds four links to the print/export sidebar portlet — EPUB, MOBI, PDF, and a "choose format" link — by calling `WsExport::getExportUrl()` for each format.
+
+Before adding links, it applies two skip conditions:
+
+1. **Gadget conflict check** — If the Gadgets extension is loaded and the current user has either the `ePubDownloadLink` or `WSexport` gadget enabled, the handler returns immediately to avoid duplicate export links (`includes/HookHandler/SidebarBeforeOutputHandler.php:37`).
+
+2. **Page eligibility check** — The handler only adds links on pages that are in a content namespace, exist, are not the main page, and are not being edited (`includes/HookHandler/SidebarBeforeOutputHandler.php:51`).
+
+When eligible, the handler checks whether the Collection or ElectronPdfService portlet is already present in the sidebar. If it is, it removes any existing PDF link (`coll-download-as-rl` or `electron-print_pdf`) before appending the Wikisource links to that portlet. If neither extension is installed, it creates a new `wikisource-export-portlet` and moves the skin's existing `printable` link into it for consistency (`includes/HookHandler/SidebarBeforeOutputHandler.php:62`).
+
+```php
+// includes/HookHandler/SidebarBeforeOutputHandler.php:13
+class SidebarBeforeOutputHandler implements SidebarBeforeOutputHook {
+
+    public function __construct(
+        Config $config,
+        Language $contentLanguage,
+        private readonly ?GadgetRepo $gadgetRepo,
+    ) { ... }
+
+    public function onSidebarBeforeOutput( $skin, &$sidebar ): void { ... }
+}
+```
+
+---
+
+## ArticleViewHeader
+
+**Class:** `MediaWiki\Extension\Wikisource\HookHandler\ArticleViewHeaderHandler`
+**Interface:** `ArticleViewHeaderHook`
+**File:** `includes/HookHandler/ArticleViewHeaderHandler.php`
+
+**Services injected:**
+
+| Service | Type | Purpose |
+|---|---|---|
+| `MainConfig` | `Config` | Reads `WikisourceWsExportUrl`, `ServerName`, and `ProofreadPageBookNamespaces` |
+| `ContentLanguage` | `Language` | Passed to `WsExport` for language code detection |
+
+**When it fires:** When MediaWiki renders the article view header, before the page content is output.
+
+**What it does:**
+
+Adds a primary progressive OOUI `ButtonWidget` labelled with `wikisource-download-button` as a page indicator in the article header. The button links directly to the EPUB export URL as a non-JS fallback.
+
+The handler only fires on pages that:
+
+- Are in a namespace listed in `$wgProofreadPageBookNamespaces` (falls back to `NS_MAIN` if ProofreadPage is not loaded)
+- Exist
+- Are not the main page
+- Are not a disambiguation page (`includes/HookHandler/ArticleViewHeaderHandler.php:52`)
+
+After rendering the button, it enqueues the `ext.wikisource.download` ResourceLoader module, which upgrades the button to a format-chooser dialog client-side. The WS Export base URL is embedded in the button's `data` attribute (`data-ooui` → `data.wsExportUrl`) so no separate JS config variable is needed (`includes/HookHandler/ArticleViewHeaderHandler.php:69`).
+
+<Note>
+  The indicator ID is prefixed with a tilde (`~ext-wikisource-download`) to sort it towards the end of the indicator list. There is no official API for controlling indicator order. The resulting DOM ID becomes `#mw-indicator-.7Eext-wikisource-download`.
+</Note>
+
+```php
+// includes/HookHandler/ArticleViewHeaderHandler.php:14
+class ArticleViewHeaderHandler implements ArticleViewHeaderHook {
+
+    public function __construct( Config $config, Language $contentLanguage ) { ... }
+
+    public function onArticleViewHeader( $article, &$outputDone, &$pcache ) { ... }
+}
+```
+
+---
+
+## EditPage::showEditForm:initial
+
+**Class:** `MediaWiki\Extension\Wikisource\HookHandler\EditPageShowEditFormInitialHandler`
+**Interface:** `EditPage__showEditForm_initialHook`
+**File:** `includes/HookHandler/EditPageShowEditFormInitialHandler.php`
+
+**Services injected:**
+
+| Service | Type | Purpose |
+|---|---|---|
+| `MainConfig` | `Config` | Reads `WikisourceEnableOcr`, `WikisourceOcrUrl`, `WikisourceTranskribusModels` |
+| `UserOptionsLookup` | `UserOptionsLookup` | Checks whether the user has the WikiEditor beta toolbar enabled |
+
+**When it fires:** When an edit form is about to be rendered, before the form HTML is output.
+
+**What it does:**
+
+Loads the `ext.wikisource.OCR` module and passes two JS config variables to the page when all four conditions are met:
+
+1. `WikisourceEnableOcr` is `true`
+2. The page content model is `CONTENT_MODEL_PROOFREAD_PAGE` (defined by ProofreadPage)
+3. `WikisourceOcrUrl` is set
+4. The editing user has the `usebetatoolbar` option enabled (WikiEditor beta toolbar)
+
+When conditions are met (`includes/HookHandler/EditPageShowEditFormInitialHandler.php:56`):
+
+```php
+$out->getCSP()->addDefaultSrc( $this->toolUrl );
+$out->addModules( 'ext.wikisource.OCR' );
+$out->addJsConfigVars( [
+    'WikisourceOcrUrl' => $this->toolUrl,
+    'WikisourceTranskribusModels' => $this->WikisourceTranskribusModels,
+] );
+```
+
+**`getLangs` callback**
+
+This class also provides the static `getLangs` method, registered as the ResourceLoader callback for `ext.wikisource.OCR/Langs.json`:
+
+```json
+// extension.json:173
+{
+    "name": "ext.wikisource.OCR/Langs.json",
+    "callback": "MediaWiki\\Extension\\Wikisource\\HookHandler\\EditPageShowEditFormInitialHandler::getLangs"
+}
+```
+
+`getLangs` queries `{WikisourceOcrUrl}/api/available_langs?engine={engine}` for each of the three engines (google, tesseract, transkribus) and caches each response for one day (`TTL_DAY`) with a one-week stale grace period. The cached data is keyed by `wikisource-ocr-langs:{engine}` in the global WAN object cache (`includes/HookHandler/EditPageShowEditFormInitialHandler.php:96`).
+
+```php
+// includes/HookHandler/EditPageShowEditFormInitialHandler.php:15
+class EditPageShowEditFormInitialHandler implements EditPage__showEditForm_initialHook {
+
+    public function __construct(
+        Config $config,
+        private readonly UserOptionsLookup $userOptionsLookup,
+    ) { ... }
+
+    public function onEditPage__showEditForm_initial( $editor, $out ) { ... }
+
+    public static function getLangs( Context $context, Config $config ): array { ... }
+}
+```
+
+---
+
+## GetPreferences
+
+**Class:** `MediaWiki\Extension\Wikisource\HookHandler\GetPreferencesHandler`
+**Interface:** `GetPreferencesHook`
+**File:** `includes/HookHandler/GetPreferencesHandler.php`
+
+**Services injected:** None.
+
+**When it fires:** When MediaWiki assembles the list of user preferences (e.g. when loading Special:Preferences or when a client calls the `options` API).
+
+**What it does:**
+
+Registers a single hidden API-only preference named `wikisource-ocr`:
+
+```php
+// includes/HookHandler/GetPreferencesHandler.php:16
+$preferences['wikisource-ocr'] = [
+    'type' => 'api'
+];
+```
+
+This preference stores a JSON-encoded string containing the user's chosen OCR engine, language selections, and onboarding state. Because the type is `api`, it does not appear in the Special:Preferences UI — it is read and written exclusively by `OcrTool.js` via `mw.user.options` and `mw.Api().saveOption()`.
+
+```php
+// includes/HookHandler/GetPreferencesHandler.php:8
+class GetPreferencesHandler implements GetPreferencesHook {
+
+    public function onGetPreferences( $user, &$preferences ) { ... }
+}
+```
+
+---
+
+## BeforePageDisplay
+
+**Class:** `MediaWiki\Extension\Wikisource\HookHandler\BeforePageDisplayHandler`
+**Interface:** `BeforePageDisplayHook`
+**File:** `includes/HookHandler/BeforePageDisplayHandler.php`
+
+**Services injected:**
+
+| Service | Type | Purpose |
+|---|---|---|
+| `UserGroupManager` | `UserGroupManager` | Checks whether the current user is in the `sysop` group |
+| `MainConfig` | `Config` | Reads `WikisourceEnableOcr`, `WikisourceEnableBulkOcr`, `WikisourceOcrUrl` |
+| `ExtensionRegistry` | `ExtensionRegistry` | Verifies that ProofreadPage is loaded |
+
+**When it fires:** Before every page is displayed, after the output object is fully constructed.
+
+**What it does:**
+
+Loads the `ext.wikisource.bulkocr` module when all four conditions are satisfied:
+
+1. ProofreadPage is loaded
+2. The current user is a member of the `sysop` group
+3. Both `WikisourceEnableOcr` and `WikisourceEnableBulkOcr` are `true`
+4. The current page is in the ProofreadPage Index namespace
+
+<Warning>
+  `WikisourceEnableBulkOcr` defaults to `false` in `extension.json`. You must explicitly set `$wgWikisourceEnableBulkOcr = true;` in `LocalSettings.php` to enable this feature.
+</Warning>
+
+When all conditions are met, the handler adds the OCR service URL to the Content Security Policy, passes it as a JS config variable, and enqueues the module (`includes/HookHandler/BeforePageDisplayHandler.php:49`):
+
+```php
+$out->getCSP()->addDefaultSrc( $ocrUrl );
+$out->addJsConfigVars( 'WikisourceOcrUrl', rtrim( $ocrUrl, '/' ) );
+$out->addModules( [ 'ext.wikisource.bulkocr' ] );
+```
+
+```php
+// includes/HookHandler/BeforePageDisplayHandler.php:18
+class BeforePageDisplayHandler implements BeforePageDisplayHook {
+
+    public function __construct(
+        private readonly UserGroupManager $userGroupManager,
+        private readonly Config $config,
+        private readonly ExtensionRegistry $extensionRegistry,
+    ) { ... }
+
+    public function onBeforePageDisplay( $out, $skin ): void { ... }
+}
+```
+
+---
+
+## WikibaseClientSiteLinksForItem
+
+**Class:** `MediaWiki\Extension\Wikisource\WikibaseClientSiteLinksForItemHandler`
+**Entry point:** `WikibaseClientSiteLinksForItemHandler::provideSiteLinks` (static)
+**File:** `includes/WikibaseClientSiteLinksForItemHandler.php`
+
+**Services injected:** None via the service container. This hook is registered as a static method reference and self-constructs via `newFromGlobalState`.
+
+**When it fires:** When Wikibase Client is building the list of site links to display in the sidebar for a connected Wikibase item.
+
+**What it does:**
+
+Augments the sidebar site links for a Wikibase item by adding links from the item's parent **work** items. This is the mechanism that allows an edition item (e.g. a specific 1889 printing) to expose links to all other Wikisource editions of the same work in the sidebar.
+
+The static `provideSiteLinks` method constructs a handler via `newFromGlobalState` (which initialises `EditionLookup` from Wikibase Client services) and then calls `doProvideSiteLinks` (`includes/WikibaseClientSiteLinksForItemHandler.php:46`).
+
+`doProvideSiteLinks` calls `EditionLookup::getWorks()` to find parent work items linked via `P629` statements, then calls `addItemSiteLinks` for each work. `addItemSiteLinks` iterates the work item's `SiteLinkList` and adds each site link to the `$siteLinks` array, skipping any site ID that is already present (to preserve existing links).
+
+```php
+// includes/WikibaseClientSiteLinksForItemHandler.php:18
+class WikibaseClientSiteLinksForItemHandler {
+
+    public static function provideSiteLinks(
+        Item $item, array &$siteLinks, UsageAccumulator $usageAccumulator
+    ) { ... }
+
+    public function doProvideSiteLinks( Item $item, array &$siteLinks ) { ... }
+}
+```
+
+<Note>
+  This handler only runs when Wikibase Client is installed. If Wikibase is not present, the `WikibaseClientSiteLinksForItem` hook is never fired, and this class is never loaded.
+</Note>

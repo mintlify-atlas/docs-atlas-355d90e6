@@ -1,0 +1,62 @@
+---
+title: "Wikibase integration"
+description: "Link Wikisource pages to Wikibase items to surface related works and editions in the sidebar."
+keywords: ["wikibase", "wikidata", "editions", "works", "sitelinks", "P747", "P629"]
+---
+
+The Wikibase integration connects Wikisource pages to structured Wikibase data. It uses two Wikibase properties to model the relationship between a literary **work** (the abstract text) and its **editions** (specific published versions). This connection allows the sidebar to display inter-language links not only for the current page's Wikibase item, but also for the parent work.
+
+## Requirements
+
+- The [Wikibase Client](https://www.mediawiki.org/wiki/Extension:Wikibase_Client) extension must be installed and configured.
+- Wikisource pages must be linked to Wikibase items in the usual way (via the "Languages" / "Edit links" interface).
+
+## How it works
+
+### Edition lookup
+
+The `EditionLookup` class (`includes/EditionLookup.php`) resolves the relationship between works and editions using two configurable Wikibase properties:
+
+- **`$wgWikisourceWikibaseEditionProperty`** (default: `P747`) — the property that says a work *has edition* pointing to an edition item.
+- **`$wgWikisourceWikibaseEditionOfProperty`** (default: `P629`) — the property that says an edition *is edition of* pointing to a work item.
+
+```php
+// Find the works for an edition item (follows P629 "edition of" statements).
+$editionLookup->getWorks( $editionItem );
+
+// Find the editions for a work item (follows P747 "has edition" statements).
+$editionLookup->getEditions( $workItem );
+```
+
+Both methods read the **best** statements for the relevant property and return the resolved `Item` objects from the entity lookup.
+
+### Site links for edition pages
+
+The `WikibaseClientSiteLinksForItemHandler` class (`includes/WikibaseClientSiteLinksForItemHandler.php`) implements the `WikibaseClientSiteLinksForItem` hook. When Wikibase Client is building the list of inter-language sidebar links for a page, this handler:
+
+1. Looks up the Wikibase item connected to the current Wikisource page.
+2. Calls `EditionLookup::getWorks()` to find the parent work item(s) linked via `P629`.
+3. Merges the site links from each work item into the sidebar link list.
+
+The result is that an edition page shows sidebar links not only to other editions on the same wiki, but also to the corresponding pages on other-language Wikisources that are linked to the parent work—even if those pages are not directly linked to the edition's own Wikibase item.
+
+Existing site links from the edition item take precedence; work item site links are only added for sites not already covered.
+
+## Configuration
+
+| Variable | Default | Description |
+|---|---|---|
+| `$wgWikisourceWikibaseEditionProperty` | `P747` | Wikibase property ID for the "has edition" relationship (work → edition). |
+| `$wgWikisourceWikibaseEditionOfProperty` | `P629` | Wikibase property ID for the "edition of" relationship (edition → work). |
+
+<Note>
+  On Wikimedia's Wikidata, `P747` is "has edition or translation" and `P629` is "edition or translation of". If your Wikibase instance uses different property IDs, update these configuration variables accordingly.
+</Note>
+
+## Practical effect
+
+When a Wikisource page is linked to a Wikibase edition item that carries a `P629` ("edition of") statement pointing to a work item, the sidebar **Languages** section automatically includes links from the work item's site links. This means readers can navigate between different language editions of the same work without each edition needing to be individually linked to every other language's page.
+
+<Tip>
+  For this feature to work, the edition item on Wikibase must have a `P629` statement pointing to the parent work item, and the work item must have site links to the relevant Wikisource pages on other languages.
+</Tip>

@@ -1,0 +1,93 @@
+---
+title: "Book export"
+description: "Download Wikisource works as EPUB, MOBI, or PDF using the WS Export service."
+keywords: ["export", "epub", "mobi", "pdf", "download", "ws-export"]
+---
+
+The export feature lets readers download Wikisource works in common e-reader and print formats. It integrates with the [WS Export](https://ws-export.wmcloud.org) service, which handles conversion from wiki markup to the requested format.
+
+## Entry points
+
+There are two ways readers can access the export feature:
+
+<CardGroup cols={2}>
+  <Card title="Article header button" icon="download">
+    A **Download** button appears as a page indicator in the article header for works in book namespaces (configured by `$wgProofreadPageBookNamespaces`). Clicking it opens a format chooser dialog.
+  </Card>
+  <Card title="Sidebar links" icon="sidebar">
+    Direct EPUB, MOBI, PDF, and "choose format" links are added to the print/export portlet in the sidebar. Clicking any of them sends the reader directly to the WS Export service for the chosen format.
+  </Card>
+</CardGroup>
+
+## Format chooser dialog
+
+When you click the **Download** button in the article header, a dialog opens with three format options:
+
+| Format | Icon | Best for |
+|---|---|---|
+| EPUB | Laptop and mobile | E-readers (Kindle, Kobo, Apple Books, etc.) |
+| MOBI | Tablet | Older Kindle devices |
+| PDF | Desktop and printer | Printing or reading on screen |
+
+The dialog also includes a "choose a different format" link that opens the WS Export web UI, where you can select additional output options.
+
+## Sidebar links
+
+The sidebar links are added to the **Print/export** portlet (or an equivalent portlet provided by the Collection or ElectronPdfService extension). The four links are:
+
+- **Download as EPUB**
+- **Download as MOBI**
+- **Download as PDF**
+- **Choose export format** — opens the WS Export format chooser page
+
+If the Collection extension is installed and adds a PDF link (`coll-download-as-rl`), or if ElectronPdfService adds a PDF link (`electron-print_pdf`), those links are removed and replaced with the Wikisource export links to avoid duplication.
+
+<Note>
+  If the user has the **ePubDownloadLink** or **WSexport** gadget enabled, sidebar links are not added. This prevents duplicate export links on wikis that still have legacy gadgets installed.
+</Note>
+
+## When export links are shown
+
+Export links (both the header button and sidebar links) are only shown when all of the following are true:
+
+- The page is in a content namespace (`$wgContentNamespaces`).
+- The page exists.
+- The page is not the main page.
+- The page is not being edited (the `action` parameter is not `edit` or `submit`).
+
+The article header button additionally requires:
+
+- The page is in a book namespace (`$wgProofreadPageBookNamespaces`).
+- The page is not a disambiguation page.
+
+## Language code detection
+
+The WS Export service requires a language code to look up the correct Wikisource subdomain. The extension determines the code using the following logic (implemented in both `WsExport.php` and `DownloadDialog.js`):
+
+```php
+// 1. Start with the wiki's content language code.
+$lang = $contentLanguage->getCode();
+
+// 2. If the server is the multilingual Wikisource root, use 'mul'.
+if ( $serverName === 'wikisource.org' ) {
+    $lang = 'mul';
+
+// 3. If the server is the English beta Wikisource, use 'beta'.
+} elseif ( strpos( $serverName, 'en.wikisource.beta' ) !== false ) {
+    $lang = 'beta';
+
+// 4. Otherwise, extract the subdomain from '*.wikisource.org'.
+} elseif ( $wikisourcePos !== false ) {
+    $lang = substr( $serverName, 0, $wikisourcePos ); // e.g. 'fr' from 'fr.wikisource.org'
+}
+```
+
+## Configuration
+
+| Variable | Default | Description |
+|---|---|---|
+| `$wgWikisourceWsExportUrl` | `https://ws-export.wmcloud.org` | Base URL of the WS Export service. Change this to point to a self-hosted instance. |
+
+<Tip>
+  You can host your own WS Export instance and set `$wgWikisourceWsExportUrl` to its URL. The extension constructs all export URLs from this base, so no other configuration is needed.
+</Tip>

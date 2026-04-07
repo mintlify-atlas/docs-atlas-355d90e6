@@ -1,0 +1,64 @@
+---
+title: "Introduction"
+description: "The Wikisource MediaWiki extension adds OCR transcription, multi-format book export, and Wikibase edition linking to your Wikisource installation."
+---
+
+<Note>
+  This is a MediaWiki extension, not standalone software. It must be installed into an existing MediaWiki instance that has the [ProofreadPage](https://www.mediawiki.org/wiki/Extension:ProofreadPage) extension enabled.
+</Note>
+
+The Wikisource extension adds a suite of tools for transcribing and exporting scanned literary works. It integrates directly with the ProofreadPage editing workflow and adds download buttons to work articles, letting readers and editors interact with texts without leaving the wiki.
+
+## Key features
+
+**OCR transcription**
+
+The extension adds an **Extract text** button to the WikiEditor beta toolbar when editing a Page namespace article. You can select from three OCR engines — Tesseract, Google Vision, or Transkribus — choose a language, and run text extraction against the scanned image. The result is inserted into the text editor for you to review and correct before saving.
+
+**Bulk OCR (admins)**
+
+Sysops can run Bulk OCR from any Index namespace page when `$wgWikisourceEnableBulkOcr` is enabled. The **Bulk OCR** button finds all untranscribed pages in the index and processes them in batches, showing live progress notifications as pages are saved.
+
+**Book export**
+
+A **Download** button appears in the article header of main-namespace work articles. Clicking it opens a format chooser with EPUB, MOBI, and PDF options. The sidebar also gains direct **Download EPUB**, **Download MOBI**, and **Download PDF** links under the **Print/export** portlet. Export is powered by the external WS Export service.
+
+**Wikibase integration**
+
+When the Wikibase Client extension is present, the extension can add site links for edition items. The properties used for "edition" (`P747` by default) and "edition of" (`P629` by default) are configurable.
+
+## System requirements
+
+| Requirement | Version |
+|---|---|
+| MediaWiki | >= 1.46 |
+| ProofreadPage extension | Required |
+| WikiEditor with beta toolbar | Required for single-page OCR |
+
+**Optional dependencies:**
+
+- **Wikibase Client** — required for edition linking via `WikibaseClientSiteLinksForItem`
+- **Gadgets extension** — required for backward-compatible sidebar gadget behavior via `GadgetsRepo`
+
+## Explore the docs
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="wrench" href="/installation">
+    Install the extension and configure your LocalSettings.php
+  </Card>
+  <Card title="Quick start" icon="rocket" href="/quickstart">
+    Export a book and run your first OCR transcription
+  </Card>
+  <Card title="OCR" icon="scan" href="/features/ocr">
+    Single-page text extraction with Tesseract, Google, or Transkribus
+  </Card>
+  <Card title="Bulk OCR" icon="layer-group" href="/features/bulk-ocr">
+    Mass-transcribe all untranscribed pages in an Index
+  </Card>
+  <Card title="Book export" icon="book-open" href="/features/export">
+    Download works as EPUB, MOBI, or PDF via WS Export
+  </Card>
+  <Card title="Wikibase integration" icon="diagram-project" href="/features/wikibase-integration">
+    Link Wikisource pages to Wikibase edition items
+  </Card>
+</CardGroup>

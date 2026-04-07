@@ -1,97 +1,65 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Wikisource MediaWiki Extension"
+description: "Add OCR text extraction, multi-format book export, and Wikibase edition linking to your Wikisource installation."
 ---
 
-## Setting up
+The Wikisource extension enhances MediaWiki-based Wikisource installations with powerful tools for transcribing scanned texts and exporting works in multiple formats. It integrates OCR engines for automated text extraction, provides one-click export to EPUB, MOBI, and PDF, and connects works to their Wikibase edition data.
 
-Get your documentation site up and running in minutes.
-
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Installation" icon="wrench" href="/installation">
+    Install the extension and configure it for your MediaWiki instance
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get up and running with OCR and export features in minutes
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="OCR Feature" icon="scan" href="/features/ocr">
+    Transcribe scanned page images using Tesseract, Google Vision, or Transkribus
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Book Export" icon="book-open" href="/features/export">
+    Export Wikisource texts to EPUB, MOBI, and PDF formats
   </Card>
-</Columns>
+  <Card title="Configuration" icon="gear" href="/configuration/settings">
+    Explore all configuration variables and their defaults
+  </Card>
+  <Card title="Development" icon="code" href="/development/architecture">
+    Understand the extension's architecture and contribute
+  </Card>
+</CardGroup>
 
-## Create beautiful pages
+## What this extension provides
 
-Everything you need to create world-class documentation.
+<CardGroup cols={2}>
+  <Card title="Single-page OCR" icon="file-image">
+    Extract text from scanned page images using your choice of OCR engine directly from the ProofreadPage editor
+  </Card>
+  <Card title="Bulk OCR" icon="layer-group">
+    Mass-transcribe entire Index pages — find all untranscribed pages and process them in batches automatically
+  </Card>
+  <Card title="Multi-format export" icon="file-export">
+    Download any Wikisource work as EPUB, MOBI, or PDF via the integrated WS Export service
+  </Card>
+  <Card title="Wikibase integration" icon="diagram-project">
+    Automatically link Wikisource pages to their Wikibase edition and work items using configurable property IDs
+  </Card>
+</CardGroup>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+## Getting started
 
-## Need inspiration?
+<Steps>
+  <Step title="Install the extension">
+    Clone the repository into your MediaWiki `extensions/` directory and add `wfLoadExtension( 'Wikisource' );` to `LocalSettings.php`. See [Installation](/installation) for full details.
+  </Step>
+  <Step title="Configure export and OCR URLs">
+    Set `$wgWikisourceWsExportUrl` and `$wgWikisourceOcrUrl` in your `LocalSettings.php` to point to the WS Export and OCR services. See [Configuration](/configuration/settings).
+  </Step>
+  <Step title="Enable OCR for editors">
+    Set `$wgWikisourceEnableOcr = true;`. Editors with the WikiEditor beta toolbar will see the OCR tool in the ProofreadPage editor automatically.
+  </Step>
+  <Step title="Start transcribing">
+    Open any Page namespace article in the editor and click the **Extract text** button to run OCR on the scanned image. See the [OCR feature guide](/features/ocr) for engine selection and language options.
+  </Step>
+</Steps>
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<Note>
+  This extension requires MediaWiki 1.46 or later and the [ProofreadPage](https://www.mediawiki.org/wiki/Extension:ProofreadPage) extension. Wikibase integration also requires the Wikibase Client extension.
+</Note>

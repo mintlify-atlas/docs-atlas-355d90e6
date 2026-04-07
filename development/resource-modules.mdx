@@ -1,0 +1,255 @@
+---
+title: 'Resource modules'
+description: 'The four ResourceLoader modules bundled with the Wikisource extension — their files, dependencies, and i18n messages.'
+keywords: ['resourceloader', 'javascript', 'modules', 'css', 'less', 'ooui']
+---
+
+The extension defines four ResourceLoader modules in `extension.json`. All module files are rooted at the `modules/` directory (`ResourceFileModulePaths.localBasePath`).
+
+```json
+// extension.json:67
+"ResourceFileModulePaths": {
+    "localBasePath": "modules",
+    "remoteExtPath": "Wikisource/modules"
+}
+```
+
+---
+
+## ext.wikisource.download
+
+**Purpose:** Upgrades the server-rendered OOUI download button (injected by `ArticleViewHeaderHandler`) into a client-side format-chooser dialog.
+
+**Enqueued by:** `ArticleViewHeaderHandler::onArticleViewHeader` — only on book namespace pages.
+
+### JavaScript files
+
+| File | Role |
+|---|---|
+| `ext.wikisource.WsExport/ext.wikisource.download.js` | Entry point. Infuses the `.ext-wikisource-download-button` element, removes its static `href`, and attaches a `DownloadDialog`. |
+| `ext.wikisource.WsExport/ext.wikisource.DownloadDialog.js` | `OO.ui.ProcessDialog` subclass. Builds EPUB, MOBI, and PDF `ChooserButton` widgets and a "different format" link to the WS Export chooser page. |
+| `ext.wikisource.WsExport/ext.wikisource.ChooserButton.js` | Individual format button widget used inside `DownloadDialog`. |
+
+The `DownloadDialog` re-derives the Wikisource language code from `wgServerName` client-side, mirroring the same logic in `WsExport.php` (`ext.wikisource.WsExport/ext.wikisource.DownloadDialog.js:34`):
+
+```js
+if ( serverName === 'wikisource.org' ) {
+    lang = 'mul';
+} else if ( serverName.includes( 'en.wikisource.beta' ) ) {
+    lang = 'beta';
+} else if ( serverName.includes( '.wikisource.org' ) ) {
+    lang = serverName.slice( 0, serverName.indexOf( '.wikisource.org' ) );
+}
+```
+
+### CSS/Less files
+
+| File | Purpose |
+|---|---|
+| `ext.wikisource.WsExport/ext.wikisource.DownloadDialog.less` | Styles the download dialog layout and format button spacing. |
+
+### Dependencies
+
+```json
+// extension.json:73
+"dependencies": [
+    "oojs-ui-core",
+    "oojs-ui-widgets",
+    "oojs-ui.styles.icons-content",
+    "oojs-ui-windows"
+]
+```
+
+### i18n messages
+
+| Message key | Used for |
+|---|---|
+| `wikisource-download-button` | Button label in the article header |
+| `wikisource-download-chooser-title` | Dialog title |
+| `wikisource-download-chooser-epub` | EPUB format button label |
+| `wikisource-download-chooser-epub-description` | EPUB format description |
+| `wikisource-download-chooser-mobi` | MOBI format button label |
+| `wikisource-download-chooser-mobi-description` | MOBI format description |
+| `wikisource-download-chooser-pdf` | PDF format button label |
+| `wikisource-download-chooser-pdf-description` | PDF format description |
+| `wikisource-download-chooser-different-format` | "Different format" link label |
+
+---
+
+## ext.wikisource.bulkocr
+
+**Purpose:** Adds a "Bulk OCR" button above each pagelist container on Index namespace pages, allowing sysop users to OCR all untranscribed pages in bulk.
+
+**Enqueued by:** `BeforePageDisplayHandler::onBeforePageDisplay` — only for sysop users on Index namespace pages when `WikisourceEnableBulkOcr` is `true`.
+
+### JavaScript files
+
+| File | Role |
+|---|---|
+| `ext.wikisource.bulkocr/ext.wikisource.bulkocr.js` | Entry point. Runs on `wikipage.content`, finds all `.prp-index-pagelist` containers, and instantiates a `BulkOcrWidget` per container. |
+| `ext.wikisource.bulkocr/BulkOcrWidget.js` | Main widget class. Orchestrates the full pipeline: querying untranscribed pages → fetching images → batched OCR → batched saves. |
+
+The `BulkOcrWidget` processes OCR requests in batches of 10 with a 1-second delay between batches to avoid rate limiting. It saves results using `mw.Api.postWithToken('csrf', { action: 'edit', createonly: 1 })` so that only new (never-transcribed) pages are written (`modules/ext.wikisource.bulkocr/BulkOcrWidget.js:327`).
+
+Progress notifications are delivered via `mw.notify` using the `bulk-ocr-progress` tag, so the same notification is updated in place throughout the process.
+
+### CSS/Less files
+
+| File | Purpose |
+|---|---|
+| `ext.wikisource.bulkocr/bulkocr.less` | Styles the bulk OCR container and button layout. |
+
+### Dependencies
+
+```json
+// extension.json:100
+"dependencies": [
+    "oojs-ui-core",
+    "oojs-ui-widgets",
+    "jquery",
+    "ext.wikisource.icons"
+]
+```
+
+### i18n messages
+
+| Message key | Used for |
+|---|---|
+| `wikisource-bulkocr-button` | Bulk OCR button label |
+| `wikisource-bulkocr-active-development-warning` | Warning message shown below the button |
+| `wikisource-bulkocr-success-message` | Notification after all pages are saved |
+| `wikisource-bulkocr-no-pages-found` | Notification when no untranscribed pages exist |
+| `wikisource-bulkocr-in-progress` | Notification while finding pages |
+| `wikisource-bulkocr-fetch-pages-failed` | Error when the page query fails |
+| `wikisource-bulkocr-fetch-images-failed` | Error when the image query fails |
+| `wikisource-bulkocr-ocr-progress` | Progress notification during OCR (takes count/total params) |
+| `wikisource-bulkocr-saving-progress` | Progress notification during saves (takes count/total params) |
+| `wikisource-bulkocr-saving-progress-with-failures` | Progress notification when some saves fail |
+
+---
+
+## ext.wikisource.icons
+
+**Purpose:** Defines five custom SVG icons used across the extension's UI.
+
+**Module class:** `MediaWiki\ResourceLoader\ImageModule`
+
+**CSS selector pattern:** `.ext-wikisource-icon-{name}`
+
+This module is a `ResourceLoader\ImageModule` rather than a standard file module. It does not include any JavaScript — it only generates CSS classes that embed SVGs as background images.
+
+### Icons
+
+| Name | File | Used in |
+|---|---|---|
+| `desktop-and-printer` | `ext.wikisource.WsExport/icons/desktop-and-printer.svg` | PDF format button in `DownloadDialog` |
+| `laptop-and-mobile` | `ext.wikisource.WsExport/icons/laptop-and-mobile.svg` | EPUB format button in `DownloadDialog` |
+| `tablet` | `ext.wikisource.WsExport/icons/tablet.svg` | MOBI format button in `DownloadDialog` |
+| `ocr-onboarding` | `ext.wikisource.OCR/OnboardingPopup.svg` | OCR onboarding popup illustration |
+| `bulk-ocr` | `ext.wikisource.bulkocr/icons/bulk-ocr.svg` | Bulk OCR toolbar button icon |
+
+```json
+// extension.json:126
+"ext.wikisource.icons": {
+    "class": "MediaWiki\\ResourceLoader\\ImageModule",
+    "selector": ".ext-wikisource-icon-{name}",
+    "images": {
+        "desktop-and-printer": { "file": "ext.wikisource.WsExport/icons/desktop-and-printer.svg" },
+        "laptop-and-mobile":   { "file": "ext.wikisource.WsExport/icons/laptop-and-mobile.svg" },
+        "tablet":              { "file": "ext.wikisource.WsExport/icons/tablet.svg" },
+        "ocr-onboarding":      { "file": "ext.wikisource.OCR/OnboardingPopup.svg" },
+        "bulk-ocr":            { "file": "ext.wikisource.bulkocr/icons/bulk-ocr.svg" }
+    }
+}
+```
+
+---
+
+## ext.wikisource.OCR
+
+**Purpose:** Adds an "Extract text" OCR button to the WikiEditor secondary toolbar when editing ProofreadPage pages.
+
+**Enqueued by:** `EditPageShowEditFormInitialHandler::onEditPage__showEditForm_initial` — only on ProofreadPage edit forms for users with the WikiEditor beta toolbar enabled.
+
+### JavaScript files
+
+| File | Role |
+|---|---|
+| `ext.wikisource.OCR/index.js` | Entry point. Creates `OcrTool` and `ExtractTextWidget`, hooks into `wikiEditor.toolbarReady` to inject the widget. |
+| `ext.wikisource.OCR/OcrTool.js` | Central model. Manages engine/language selection, config persistence (`wikisource-ocr` user option), and the OCR HTTP request lifecycle. |
+| `ext.wikisource.OCR/ExtractTextWidget.js` | Main UI widget containing the "Extract text" button, loading state, undo, and settings menu. |
+| `ext.wikisource.OCR/OnboardingPopup.js` | Pulsating-dot popup shown on first use to introduce the OCR feature. |
+| `ext.wikisource.OCR/LoadingWidget.js` | Spinner and cancel button shown while an OCR request is in flight. |
+| `ext.wikisource.OCR/UndoWidget.js` | Widget shown after a successful OCR extraction with an "Undo" button. |
+| `ext.wikisource.OCR/Langs.json` | Dynamically generated JSON file listing available languages per engine (see below). |
+
+**`Langs.json` callback**
+
+`Langs.json` is not a static file — it is generated at bundle time by the `getLangs` ResourceLoader callback on `EditPageShowEditFormInitialHandler`:
+
+```json
+// extension.json:173
+{
+    "name": "ext.wikisource.OCR/Langs.json",
+    "callback": "MediaWiki\\Extension\\Wikisource\\HookHandler\\EditPageShowEditFormInitialHandler::getLangs"
+}
+```
+
+The callback fetches available languages from `{WikisourceOcrUrl}/api/available_langs?engine={engine}` for each of the three engines (google, tesseract, transkribus), caches each response for one day, and returns the combined result as a JSON object keyed by engine name. This data is loaded by `OcrTool.js` as `this.allLangs` (`modules/ext.wikisource.OCR/OcrTool.js:43`).
+
+<Note>
+  `ext.wikisource.OCR` has `skipStructureTest: true` in `extension.json` because `Langs.json` is a callback-generated file, which causes the standard module structure test to fail.
+</Note>
+
+### CSS/Less files
+
+| File | Purpose |
+|---|---|
+| `ext.wikisource.OCR/ExtractTextWidget.less` | Layout for the extract text widget in the toolbar |
+| `ext.wikisource.OCR/TextBoxWidget.less` | Styles for the OCR text output area |
+| `ext.wikisource.OCR/OnboardingPopup.less` | Styles for the onboarding popup overlay |
+
+### Dependencies
+
+```json
+// extension.json:148
+"dependencies": [
+    "jquery.spinner",
+    "ext.proofreadpage.page.edit",
+    "mediawiki.api",
+    "mediawiki.pulsatingdot",
+    "ext.wikisource.icons",
+    "oojs-ui-core",
+    "oojs-ui-widgets",
+    "oojs-ui-windows",
+    "oojs-ui.styles.icons-movement",
+    "oojs-ui.styles.indicators",
+    "oojs-ui.styles.icons-editing-core"
+]
+```
+
+### i18n messages
+
+| Message key | Used for |
+|---|---|
+| `wikisource-ocr-extract-text` | "Extract text" button label |
+| `wikisource-ocr-extract-text-title` | Tooltip for the extract text button |
+| `wikisource-ocr-extract-progress` | Label shown while OCR is running |
+| `wikisource-ocr-extract-cancel` | Cancel button label |
+| `wikisource-ocr-extract-undo` | Undo button label |
+| `wikisource-ocr-extract-close` | Close button label |
+| `wikisource-ocr-error` | Generic OCR error message |
+| `wikisource-ocr-no-text` | Message when OCR returns no text |
+| `wikisource-ocr-settings-menu` | Settings menu button label |
+| `wikisource-ocr-engine` | Engine selector label |
+| `wikisource-ocr-engine-tesseract` | Tesseract engine option label |
+| `wikisource-ocr-engine-google` | Google Cloud Vision engine option label |
+| `wikisource-ocr-engine-transkribus` | Transkribus engine option label |
+| `wikisource-ocr-engine-line-model-checkbox-label` | Transkribus line detection model checkbox label |
+| `wikisource-ocr-advanced` | Advanced settings section label |
+| `wikisource-ocr-advanced-title` | Advanced settings dialog title |
+| `wikisource-ocr-onboarding-title` | Onboarding popup title |
+| `wikisource-ocr-onboarding-text` | Onboarding popup body text |
+| `wikisource-ocr-onboarding-button` | Onboarding popup dismiss button label |
+| `wikisource-ocr-language-dropdown-label` | Language selector label |
+| `wikisource-ocr-model-dropdown-label` | Model selector label (Transkribus) |

@@ -1,0 +1,188 @@
+---
+title: 'Testing'
+description: 'How to run the PHP and JavaScript test suites for the Wikisource MediaWiki extension.'
+keywords: ['testing', 'phpunit', 'eslint', 'stylelint', 'grunt', 'composer', 'phpcs']
+---
+
+The extension has two test surfaces: a PHP test suite run via Composer, and a JavaScript linting suite run via Grunt and npm.
+
+## PHP tests
+
+PHP tests use MediaWiki's PHPUnit integration. The test files live under `tests/phpunit/includes/`.
+
+### Running the tests
+
+<Steps>
+  <Step title="Install PHP dependencies">
+    ```bash
+    composer install
+    ```
+  </Step>
+  <Step title="Run the full PHP test suite">
+    The `composer test` script runs three checks in sequence: a syntax lint pass, PHPCS code style, and a minus-x executable-bit check.
+
+    ```bash
+    composer test
+    ```
+
+    You can also run each check individually:
+
+    ```bash
+    # Syntax lint only
+    composer exec parallel-lint -- . --exclude vendor --exclude node_modules
+
+    # Code style only
+    composer phpcs
+
+    # Executable-bit check only
+    composer exec minus-x -- check .
+    ```
+  </Step>
+  <Step title="Run PHPUnit directly">
+    To run the unit and integration tests against a MediaWiki installation:
+
+    ```bash
+    php vendor/bin/phpunit --group Wikisource
+    ```
+
+    Both test classes are tagged with `@group Wikisource`.
+  </Step>
+</Steps>
+
+### PHP code style
+
+PHPCS is configured via `.phpcs.xml` and uses the `mediawiki/mediawiki-codesniffer` ruleset (version `50.0.0`). Run it directly with:
+
+```bash
+composer phpcs
+```
+
+To auto-fix violations:
+
+```bash
+composer fix
+```
+
+The `fix` script runs `minus-x fix` followed by `phpcbf`.
+
+### Static analysis
+
+Phan is configured via `mediawiki/mediawiki-phan-config`. Run it with:
+
+```bash
+composer phan
+```
+
+### Test structure
+
+The PHP tests are located in `tests/phpunit/includes/` and cover the two utility classes that contain non-trivial logic:
+
+<AccordionGroup>
+  <Accordion title="WsExportTest.php">
+    **Class under test:** `MediaWiki\Extension\Wikisource\WsExport`
+    **Test class:** `MediaWiki\Extension\Wikisource\WsExportTest` (extends `MediaWikiIntegrationTestCase`)
+
+    Tests the language code detection logic in `WsExport::getExportUrl()`. The data provider `provideServerName` covers five cases:
+
+    | Server name | Expected lang |
+    |---|---|
+    | `localhost` | Uses content language code (e.g. `ru`) |
+    | `en.wikisource.org` | `en` |
+    | `wikisource.org` | `mul` (multilingual) |
+    | `foo.example.com` | Falls back to content language code (e.g. `pt-br`) |
+    | `en.wikisource.beta.wmflabs.org` | `beta` |
+
+    See `tests/phpunit/includes/WsExportTest.php:18`.
+  </Accordion>
+  <Accordion title="WikibaseClientSiteLinksForItemHandlerTest.php">
+    **Class under test:** `MediaWiki\Extension\Wikisource\WikibaseClientSiteLinksForItemHandler`
+    **Test class:** `MediaWiki\Extension\Wikisource\WikibaseClientSiteLinksForItemHandlerTest` (extends `PHPUnit\Framework\TestCase`)
+
+    Tests `doProvideSiteLinks` using an `InMemoryEntityLookup` populated with fixture items. The data provider covers four cases:
+
+    - **Item with work** — Work item's site links are merged into an empty `$siteLinks` array.
+    - **Item with work with existing** — Work item's links are added, but existing site links for the same site ID are not overwritten.
+    - **Item without work** — No `P629` statement; `$siteLinks` is unchanged.
+    - **Not existing work item** — `P629` points to a non-existent entity; `$siteLinks` is unchanged.
+
+    A separate `testDoProvideSiteLinksWithLimit` test verifies that the `RestrictedEntityLookup` entity access cap is respected without causing errors.
+
+    See `tests/phpunit/includes/WikibaseClientSiteLinksForItemHandlerTest.php:30`.
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+  There are currently no PHP tests for the hook handler classes. The hook handlers depend heavily on MediaWiki services and skin context, which makes unit testing them require either integration test infrastructure or extensive mocking.
+</Note>
+
+---
+
+## JavaScript tests
+
+JavaScript quality is enforced through linting — there are no JavaScript unit tests at this time.
+
+### Running the linters
+
+<Steps>
+  <Step title="Install Node.js dependencies">
+    ```bash
+    npm install
+    ```
+  </Step>
+  <Step title="Run all JavaScript linters">
+    ```bash
+    npm test
+    ```
+
+    This runs the `grunt test` task, which executes three linters in sequence.
+  </Step>
+</Steps>
+
+### Grunt tasks
+
+The `Gruntfile.js` defines two tasks:
+
+```js
+// Gruntfile.js:36-41
+grunt.registerTask( 'test', [ 'eslint', 'banana', 'stylelint' ] );
+grunt.registerTask( 'fix', function () {
+    grunt.config.set( 'eslint.options.fix', true );
+    grunt.config.set( 'stylelint.options.fix', true );
+    grunt.task.run( [ 'eslint', 'banana', 'stylelint' ] );
+} );
+```
+
+| Task | Tool | What it checks |
+|---|---|---|
+| `eslint` | `grunt-eslint` with `eslint-config-wikimedia` | All `*.js` and `*.json` files outside `node_modules/` and `vendor/` |
+| `banana` | `grunt-banana-checker` | i18n message file structure and consistency (reads `MessagesDirs` from `extension.json`) |
+| `stylelint` | `grunt-stylelint` with `stylelint-config-wikimedia` | All `*.less` and `*.css` files outside `node_modules/` and `vendor/` |
+
+ESLint and Stylelint both support a `--fix` flag. To auto-fix violations:
+
+```bash
+npm run fix
+# or
+grunt fix
+```
+
+### Running individual linters
+
+```bash
+# ESLint only
+npx grunt eslint
+
+# i18n message check only
+npx grunt banana
+
+# Stylelint only
+npx grunt stylelint
+```
+
+### Linter configuration
+
+| Tool | Config source |
+|---|---|
+| ESLint | `eslint-config-wikimedia` (version `0.32.3`); per-file overrides can be added in `.eslintrc.json` |
+| Stylelint | `stylelint-config-wikimedia` (version `0.18.0`) |
+| Banana checker | Reads `MessagesDirs` directly from `extension.json` at `Gruntfile.js:3` |

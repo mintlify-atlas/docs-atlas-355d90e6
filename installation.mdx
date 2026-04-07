@@ -1,0 +1,112 @@
+---
+title: "Installation"
+description: "Install the Wikisource MediaWiki extension and configure it for your wiki."
+---
+
+## Prerequisites
+
+Before installing, confirm your environment meets these requirements:
+
+- MediaWiki **>= 1.46**
+- The **ProofreadPage** extension is installed and enabled
+- The **WikiEditor** extension is installed (required for OCR toolbar integration)
+
+<Note>
+  WikiEditor's beta toolbar must be enabled in user preferences for the OCR tool to appear. The extension checks the `usebetatoolbar` user option at page load time.
+</Note>
+
+## Install the extension
+
+<Steps>
+  <Step title="Download the extension">
+    Clone the repository from Gerrit into your MediaWiki `extensions/` directory:
+
+    ```bash
+    cd /path/to/mediawiki/extensions
+    git clone https://gerrit.wikimedia.org/r/mediawiki/extensions/Wikisource
+    ```
+
+    Alternatively, you can clone the GitHub mirror:
+
+    ```bash
+    git clone https://github.com/wikimedia/mediawiki-extensions-Wikisource Wikisource
+    ```
+  </Step>
+
+  <Step title="Verify the directory name">
+    The folder must be named exactly `Wikisource` (capital W). MediaWiki resolves extension names by directory name.
+
+    ```bash
+    ls extensions/Wikisource/extension.json
+    ```
+  </Step>
+
+  <Step title="Load the extension in LocalSettings.php">
+    Add the following line to your `LocalSettings.php`, after any lines that load ProofreadPage and WikiEditor:
+
+    ```php
+    wfLoadExtension( 'Wikisource' );
+    ```
+  </Step>
+
+  <Step title="Configure required settings">
+    Add the minimal configuration block to `LocalSettings.php`:
+
+    ```php
+    wfLoadExtension( 'Wikisource' );
+
+    // URL of the WS Export service
+    $wgWikisourceWsExportUrl = 'https://ws-export.wmcloud.org';
+
+    // Enable single-page OCR
+    $wgWikisourceEnableOcr = true;
+
+    // URL of the OCR service
+    $wgWikisourceOcrUrl = 'https://ocr.wmcloud.org/';
+    ```
+
+    <Tip>
+      The URLs above point to the Wikimedia Cloud Services instances of WS Export and the OCR tool — the same services used by the Wikisource wikis. You can use them directly or host your own instances and point these variables at your own URLs.
+    </Tip>
+  </Step>
+</Steps>
+
+## Optional configuration
+
+**Enable Bulk OCR for admins**
+
+By default, Bulk OCR is disabled. To enable it for sysops on Index pages:
+
+```php
+$wgWikisourceEnableBulkOcr = true;
+```
+
+<Warning>
+  The Bulk OCR feature is under active development. Use it with caution on production wikis.
+</Warning>
+
+**HTTP proxy**
+
+If your server needs a proxy to reach the external OCR and export services, set:
+
+```php
+$wgWikisourceHttpProxy = 'http://proxy.example.org:8080';
+```
+
+**Wikibase integration**
+
+If the Wikibase Client extension is installed, the extension registers a `WikibaseClientSiteLinksForItem` hook handler automatically. The default property IDs are:
+
+```php
+// Property for "edition" links (default: P747)
+$wgWikisourceWikibaseEditionProperty = 'P747';
+
+// Property for "edition of" links (default: P629)
+$wgWikisourceWikibaseEditionOfProperty = 'P629';
+```
+
+## Verify the installation
+
+After saving `LocalSettings.php`, open any Page namespace article and click **Edit**. If installation succeeded and the user has WikiEditor's beta toolbar enabled, you will see a **Transcribe text** button in the editor toolbar.
+
+On any main-namespace work article you should see a **Download** button in the article header and **Download EPUB**, **Download MOBI**, and **Download PDF** links in the **Print/export** sidebar section.

@@ -1,0 +1,79 @@
+{
+  "projectType": "general",
+  "projectName": "Wikisource MediaWiki Extension",
+  "projectDescription": "A MediaWiki extension that adds OCR text extraction, multi-format book export (EPUB, MOBI, PDF), and Wikibase edition linking features to Wikisource.",
+  "theme": "palm",
+  "primaryColor": "#3366cc",
+  "lightColor": "#eaf3fb",
+  "darkColor": "#1a3d6e",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "features/ocr",
+              "features/bulk-ocr",
+              "features/export",
+              "features/wikibase-integration"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/settings",
+              "configuration/transkribus-models",
+              "configuration/ocr-engines"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "development/architecture",
+              "development/hooks",
+              "development/resource-modules",
+              "development/testing"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Single-page OCR with Tesseract, Google Vision, and Transkribus engines",
+    "Bulk OCR for mass transcription of untranscribed Index pages",
+    "Book export to EPUB, MOBI, and PDF via WS Export tool",
+    "Sidebar and article header download buttons",
+    "Wikibase integration for edition-of-work linking",
+    "Per-user OCR preferences with language/model selection",
+    "Onboarding popup for first-time OCR users"
+  ],
+  "publicApiSurface": [
+    "SidebarBeforeOutput hook — adds export links to page sidebar",
+    "ArticleViewHeader hook — adds download button to article header",
+    "EditPage::showEditForm:initial hook — injects OCR toolbar into page editor",
+    "GetPreferences hook — adds OCR user preferences",
+    "BeforePageDisplay hook — loads Bulk OCR module on Index pages for admins",
+    "WikibaseClientSiteLinksForItem hook — provides site links for Wikibase items",
+    "EditionLookup::getWorks(Item) — finds works for a given edition",
+    "EditionLookup::getEditions(Item) — finds editions for a given work",
+    "WsExport::getExportUrl(Title, format) — generates export URL for a page",
+    "OcrTool::extractText() — triggers OCR text extraction for the current page",
+    "BulkOcrWidget::executeBulkOcr() — runs batch OCR on untranscribed index pages",
+    "$wgWikisourceEnableOcr — enables or disables the OCR feature",
+    "$wgWikisourceEnableBulkOcr — enables or disables the Bulk OCR feature",
+    "$wgWikisourceOcrUrl — sets the base URL for the OCR service",
+    "$wgWikisourceWsExportUrl — sets the base URL for the WS Export service",
+    "$wgWikisourceTranskribusModels — defines Transkribus HTR models per wiki"
+  ]
+}

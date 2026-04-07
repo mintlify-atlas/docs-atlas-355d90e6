@@ -1,0 +1,149 @@
+---
+title: 'Architecture overview'
+description: 'How the Wikisource MediaWiki extension is structured — PHP backend, JavaScript frontend, and external service dependencies.'
+keywords: ['architecture', 'php', 'javascript', 'resourceloader', 'hook handlers']
+---
+
+The Wikisource extension is organized into two layers: a **PHP backend** that integrates with MediaWiki via hook handlers and service classes, and a **JavaScript frontend** delivered through ResourceLoader modules. These two layers communicate through JS config variables and server-rendered HTML attributes.
+
+## PHP backend
+
+All PHP classes live under the `MediaWiki\Extension\Wikisource\` namespace, autoloaded from the `includes/` directory.
+
+```json
+// extension.json
+"AutoloadNamespaces": {
+    "MediaWiki\\Extension\\Wikisource\\": "includes/"
+}
+```
+
+### Hook handlers
+
+Each hook handler lives in `includes/HookHandler/` and implements exactly one MediaWiki hook interface. The handler is instantiated by the service container with its declared dependencies injected via the constructor. See [Hook handlers](/development/hooks) for full details on each handler.
+
+| Class | Hook | Responsibility |
+|---|---|---|
+| `SidebarBeforeOutputHandler` | `SidebarBeforeOutput` | Adds EPUB/MOBI/PDF/choose-format links to the sidebar portlet |
+| `ArticleViewHeaderHandler` | `ArticleViewHeader` | Adds a download button as a page indicator on book namespace pages |
+| `EditPageShowEditFormInitialHandler` | `EditPage::showEditForm:initial` | Loads OCR modules on ProofreadPage edit forms |
+| `GetPreferencesHandler` | `GetPreferences` | Registers the `wikisource-ocr` user preference |
+| `BeforePageDisplayHandler` | `BeforePageDisplay` | Loads the bulk OCR module for sysops on Index namespace pages |
+| `WikibaseClientSiteLinksForItemHandler` | `WikibaseClientSiteLinksForItem` | Augments Wikibase sidebar links with work-item site links |
+
+### Service classes
+
+Beyond hook handlers, three classes provide shared logic:
+
+**`WsExport`** (`includes/WsExport.php`)
+
+Builds URLs for the WS Export service. It derives the Wikisource language code from the server name (e.g. `en.wikisource.org` → `en`, `wikisource.org` → `mul`, beta lab → `beta`) and constructs query strings for specific formats or the general chooser page.
+
+```php
+// includes/WsExport.php:49
+public function getExportUrl( Title $title, ?string $format = null ): string
+```
+
+Both `SidebarBeforeOutputHandler` and `ArticleViewHeaderHandler` instantiate `WsExport` in their constructors using `MainConfig` and `ContentLanguage`.
+
+**`EditionLookup`** (`includes/EditionLookup.php`)
+
+Queries Wikibase for edition/work relationships. It uses two configurable Wikibase property IDs:
+
+- `WikisourceWikibaseEditionProperty` (default: `P747`) — "edition" statements on a work item
+- `WikisourceWikibaseEditionOfProperty` (default: `P629`) — "edition of" statements on an edition item
+
+`EditionLookup::getWorks()` traverses `P629` statements to find the parent work items, while `getEditions()` traverses `P747` to find child editions. Results are resolved through a `RestrictedEntityLookup` to respect entity access limits.
+
+```php
+// includes/EditionLookup.php:64
+public function getWorks( Item $item ): array
+
+// includes/EditionLookup.php:72
+public function getEditions( Item $item ): array
+```
+
+**`WikibaseClientSiteLinksForItemHandler`** (`includes/WikibaseClientSiteLinksForItemHandler.php`)
+
+Implements the `WikibaseClientSiteLinksForItem` hook as a static entry point (`provideSiteLinks`) that self-constructs via `newFromGlobalState`. At runtime it delegates to `doProvideSiteLinks`, which calls `EditionLookup::getWorks()` and merges the work item's site links into the sidebar — without overwriting links that already exist for a given site.
+
+```php
+// includes/WikibaseClientSiteLinksForItemHandler.php:46
+public static function provideSiteLinks(
+    Item $item, array &$siteLinks, UsageAccumulator $usageAccumulator
+)
+```
+
+## JavaScript frontend
+
+The JavaScript layer is delivered via four [ResourceLoader modules](/development/resource-modules). Each module is scoped to specific page types and is only enqueued when the corresponding PHP hook handler determines that it is needed.
+
+| Module | Enqueued by | Page context |
+|---|---|---|
+| `ext.wikisource.download` | `ArticleViewHeaderHandler` | Book namespace pages (view mode) |
+| `ext.wikisource.OCR` | `EditPageShowEditFormInitialHandler` | ProofreadPage edit forms |
+| `ext.wikisource.bulkocr` | `BeforePageDisplayHandler` | Index namespace pages (sysops only) |
+| `ext.wikisource.icons` | `ArticleViewHeaderHandler` (styles) | Wherever icons are needed |
+
+### `ext.wikisource.download`
+
+Infuses the server-rendered OOUI download button into a fully client-side widget. The entry point (`ext.wikisource.download.js`) finds the `.ext-wikisource-download-button` element, removes the static `href`, and attaches a `DownloadDialog` (an `OO.ui.ProcessDialog`) that presents EPUB, MOBI, and PDF chooser buttons built by `ChooserButton.js`.
+
+The WS Export base URL is passed from PHP via a `data` attribute on the button element (`data.wsExportUrl`) — no extra JS config variable is needed.
+
+### `ext.wikisource.OCR`
+
+Adds an "Extract text" button to the WikiEditor secondary toolbar on ProofreadPage edit forms. The entry point (`index.js`) creates an `OcrTool` instance (the central model) and an `ExtractTextWidget` (the UI), then hooks into `wikiEditor.toolbarReady` to inject the widget.
+
+`OcrTool.js` manages engine selection (tesseract / google / transkribus), language/model preferences (persisted to the `wikisource-ocr` user option via `mw.Api`), and the OCR request lifecycle. It reads `WikisourceOcrUrl` and `WikisourceTranskribusModels` from `mw.config`.
+
+Available languages per engine are loaded at module-bundle time from `Langs.json`, which is generated dynamically by `EditPageShowEditFormInitialHandler::getLangs` — a ResourceLoader callback that fetches language lists from the OCR service API and caches the result for one day.
+
+### `ext.wikisource.bulkocr`
+
+Adds a "Bulk OCR" button above each `<div class="prp-index-pagelist">` container on Index namespace pages. The entry point (`ext.wikisource.bulkocr.js`) runs on `wikipage.content` and instantiates a `BulkOcrWidget` per pagelist container.
+
+`BulkOcrWidget.js` orchestrates the full pipeline: querying the `proofreadpagesinindex` API for untranscribed pages, fetching page images via `imageforpage`, running OCR requests in batches of 10 against the OCR service, and saving results back to wiki pages via `mw.Api.postWithToken`. Progress is reported through `mw.notify`.
+
+### `ext.wikisource.icons`
+
+A `MediaWiki\ResourceLoader\ImageModule` that bundles five SVG icons and exposes them as CSS classes using the selector `.ext-wikisource-icon-{name}`:
+
+- `desktop-and-printer` — PDF format
+- `laptop-and-mobile` — EPUB format
+- `tablet` — MOBI format
+- `ocr-onboarding` — OCR onboarding popup illustration
+- `bulk-ocr` — Bulk OCR toolbar button
+
+## External service dependencies
+
+The extension calls two external services. Both URLs are configurable via `LocalSettings.php`.
+
+<CardGroup cols={2}>
+  <Card title="WS Export" icon="file-export">
+    Default URL: `https://ws-export.wmcloud.org`
+
+    Config variable: `$wgWikisourceWsExportUrl`
+
+    Converts Wikisource articles to EPUB, MOBI, PDF, and other formats. The extension builds export URLs and passes them to the browser — no server-side proxying occurs for downloads.
+  </Card>
+  <Card title="OCR service" icon="scan-text">
+    Default URL: `https://ocr.wmcloud.org/`
+
+    Config variable: `$wgWikisourceOcrUrl`
+
+    Extracts text from page images using Tesseract, Google Cloud Vision, or Transkribus. The browser calls the service directly; the PHP side adds the URL to the Content Security Policy. An optional HTTP proxy (`$wgWikisourceHttpProxy`) can be set for server-side language list fetches.
+  </Card>
+</CardGroup>
+
+## Extension dependencies
+
+<Note>
+  ProofreadPage is a hard requirement. The OCR and bulk OCR features will not load without it, and the extension falls back gracefully (namespace checks, `defined('CONTENT_MODEL_PROOFREAD_PAGE')`) when it is absent.
+</Note>
+
+| Extension | Type | Used for |
+|---|---|---|
+| ProofreadPage | Required | `CONTENT_MODEL_PROOFREAD_PAGE`, `ProofreadPageBookNamespaces`, Index namespace ID, OSD controller hook |
+| WikiEditor | Required (for OCR) | `usebetatoolbar` user option; `wikiEditor.toolbarReady` hook |
+| Wikibase Client | Optional | `WikibaseClientSiteLinksForItem` hook; `EditionLookup` entity lookups |
+| Gadgets | Optional | Detecting `ePubDownloadLink` / `WSexport` gadgets to suppress duplicate sidebar links |

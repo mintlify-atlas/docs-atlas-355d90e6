@@ -1,0 +1,81 @@
+---
+title: "Configuration reference"
+description: "Complete reference for all configuration variables available in the Wikisource MediaWiki extension."
+---
+
+The Wikisource extension exposes configuration variables that you set in your wiki's `LocalSettings.php` file. All variables follow the standard MediaWiki `$wg` prefix convention.
+
+## Variables
+
+<ParamField path="$wgWikisourceWikibaseEditionProperty" type="string" default="P747">
+  The Wikibase property ID used to express the "has edition" relationship between a work and its edition. This is used when linking Wikisource pages to Wikidata items.
+</ParamField>
+
+<ParamField path="$wgWikisourceWikibaseEditionOfProperty" type="string" default="P629">
+  The Wikibase property ID used to express the "edition of" relationship — the inverse of the edition property. This is used when linking an edition back to the parent work on Wikidata.
+</ParamField>
+
+<ParamField path="$wgWikisourceWsExportUrl" type="string" default="https://ws-export.wmcloud.org">
+  The base URL of the WS Export service, which generates downloadable EPUB, MOBI, and PDF versions of Wikisource texts. You can point this to a self-hosted WS Export instance if needed.
+</ParamField>
+
+<ParamField path="$wgWikisourceEnableOcr" type="bool" default="true">
+  Enables the single-page OCR toolbar in the ProofreadPage editor. When set to `true`, users editing pages in the Page namespace will see the OCR extraction tool in the WikiEditor toolbar.
+
+  Setting this to `false` also disables Bulk OCR, regardless of `$wgWikisourceEnableBulkOcr`.
+</ParamField>
+
+<ParamField path="$wgWikisourceOcrUrl" type="string" default="https://ocr.wmcloud.org/">
+  The base URL of the OCR service. This service handles all three OCR engines: Tesseract, Google Vision, and Transkribus. Available languages and models are fetched from this URL at extension load time and cached for one day.
+</ParamField>
+
+<ParamField path="$wgWikisourceEnableBulkOcr" type="bool" default="false">
+  Enables the Bulk OCR feature for administrators on Index namespace pages. When enabled, sysop users will see a "Bulk OCR" button on Index pages, which processes all untranscribed pages in that index using the OCR service.
+
+  <Warning>
+    Bulk OCR requires both `$wgWikisourceEnableOcr = true` and `$wgWikisourceEnableBulkOcr = true` to function. It is restricted to users in the `sysop` group and is currently under active development. Behavior may change between releases.
+  </Warning>
+</ParamField>
+
+<ParamField path="$wgWikisourceHttpProxy" type="string|false" default="false">
+  An HTTP proxy URL to use when making requests to external APIs, including the OCR service and the WS Export service. Set this to a proxy URL string (e.g. `"http://proxy.example.org:8080"`) if your MediaWiki server cannot reach external services directly. Set to `false` to make requests without a proxy.
+</ParamField>
+
+<ParamField path="$wgWikisourceTranskribusModels" type="array" default="{}">
+  Per-wiki configuration for Transkribus handwritten text recognition (HTR) and line-detection models. Keys are wiki database names (e.g. `enwikisource`), and values are objects specifying the available HTR model names and an optional line detection model ID.
+
+  See the [Transkribus models](/configuration/transkribus-models) page for the full model list and instructions on adding your own wiki.
+</ParamField>
+
+## Example configuration
+
+The following example shows a complete Wikisource configuration block for `LocalSettings.php`:
+
+```php
+// Wikibase property IDs for edition relationships
+$wgWikisourceWikibaseEditionProperty = 'P747';
+$wgWikisourceWikibaseEditionOfProperty = 'P629';
+
+// WS Export service URL
+$wgWikisourceWsExportUrl = 'https://ws-export.wmcloud.org';
+
+// OCR settings
+$wgWikisourceEnableOcr = true;
+$wgWikisourceOcrUrl = 'https://ocr.wmcloud.org/';
+
+// Enable Bulk OCR for sysops (requires $wgWikisourceEnableOcr = true)
+$wgWikisourceEnableBulkOcr = false;
+
+// HTTP proxy for external API requests (set to false to disable)
+$wgWikisourceHttpProxy = false;
+
+// Transkribus HTR model configuration (keyed by wiki DB name)
+$wgWikisourceTranskribusModels = [
+    'enwikisource' => [
+        'htr' => [ 'en-b2022', 'en-handwritten-m3', 'en-print-m1', 'en-typewriter' ],
+    ],
+    'frwikisource' => [
+        'htr' => [ 'fr-m1' ],
+    ],
+];
+```

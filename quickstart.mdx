@@ -1,80 +1,120 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: "Quick start"
+description: "Export a book, transcribe a page with OCR, and run Bulk OCR — from zero to your first result."
 ---
 
-## Get started in three steps
+This guide walks you through the three main workflows the Wikisource extension provides. Complete the [Installation](/installation) steps first.
 
-Get your documentation site running locally and make your first customization.
+## Export a book
 
-### Step 1: Set up your local environment
+The export feature requires no special user rights and works on any main-namespace work article.
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+<Steps>
+  <Step title="Navigate to a work article">
+    Go to a main-namespace article that represents a complete Wikisource work — for example, a novel, poem collection, or legal text that has been proofread.
+  </Step>
+  <Step title="Click the Download button">
+    In the article header you will see a **Download** button. Click it to open the **Pick a format** chooser dialog, which offers three options:
 
-### Step 2: Deploy your changes
+    - **EPUB** — for computers, mobiles, and tablets
+    - **MOBI** — for Kindles
+    - **PDF** — for large screens and printing
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    Select a format to start the download via the WS Export service.
+  </Step>
+  <Step title="Use sidebar links for direct download">
+    The **Print/export** section in the sidebar provides direct one-click links:
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    - **Download EPUB**
+    - **Download MOBI**
+    - **Download PDF**
+    - **Other formats** — opens the WS Export form where you can choose fonts, image options, and additional formats
+  </Step>
+</Steps>
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+## Transcribe a page with OCR
 
-### Step 3: Go live
+Single-page OCR is available to any editor who has WikiEditor's beta toolbar enabled in their preferences.
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+<Steps>
+  <Step title="Enable the WikiEditor beta toolbar">
+    Go to **Preferences → Editing** and enable **Enable the editing toolbar**. Make sure the beta toolbar (WikiEditor 2010) is active, as the OCR button only appears when the `usebetatoolbar` preference is set.
+  </Step>
+  <Step title="Open a Page namespace article for editing">
+    Navigate to a page in the `Page:` namespace — for example, `Page:SomeBook.djvu/5`. Click **Edit** to open the ProofreadPage editor.
+  </Step>
+  <Step title="Click Transcribe text">
+    In the editor toolbar, click the **Transcribe text** button (tooltip: **Get OCR text of this image**). A panel opens below the toolbar.
+  </Step>
+  <Step title="Select your OCR engine and language">
+    The panel shows a **Select your default text transcription tool** dropdown with three engines:
+
+    - **Tesseract OCR** — open-source, broad language support
+    - **Google OCR** — Google Vision API
+    - **Transkribus OCR** — handwritten text recognition models
+
+    Optionally select a language from the **Languages (optional)** dropdown, or a model from the **Text recognition model** dropdown if available for your engine.
+  </Step>
+  <Step title="Run OCR and review the result">
+    Click **Transcribe text** to start extraction. The toolbar shows **Transcribing text from image…** while the request is in progress. When complete, the extracted text is inserted into the text editor.
+
+    Review the result for errors, make corrections, and click **Save** as you would for any edit. If the result is wrong, click **Undo transcription** to revert to the previous text.
+  </Step>
+</Steps>
+
+<Note>
+  OCR requires `$wgWikisourceEnableOcr = true` and a valid `$wgWikisourceOcrUrl` in `LocalSettings.php`. If the button is missing, confirm that WikiEditor's beta toolbar is enabled in your user preferences.
+</Note>
+
+## Run Bulk OCR (admins only)
+
+Bulk OCR processes all untranscribed pages in an Index in a single operation. It requires sysop rights and `$wgWikisourceEnableBulkOcr = true`.
+
+<Steps>
+  <Step title="Enable Bulk OCR in LocalSettings.php">
+    Add the following to `LocalSettings.php` if you have not already:
+
+    ```php
+    $wgWikisourceEnableBulkOcr = true;
+    ```
+
+    Only users in the `sysop` group will see the Bulk OCR interface.
+  </Step>
+  <Step title="Navigate to an Index page">
+    Go to an `Index:` namespace page — for example, `Index:SomeBook.djvu`. This page lists all the Page namespace sub-pages for a scanned work.
+  </Step>
+  <Step title="Click the Bulk OCR button">
+    At the top of the Index page you will see a **Bulk OCR** button. Click it to start the process. The extension identifies all pages with no existing transcription text.
+
+    <Warning>
+      The Bulk OCR feature is under active development. Behavior may change between releases. Only pages that do not yet exist (have never been transcribed) are processed — existing pages are never overwritten.
+    </Warning>
+  </Step>
+  <Step title="Monitor progress">
+    The interface shows live progress notifications:
+
+    - **Bulk OCR in progress** — while pages are being processed
+    - **OCR progress: X/Y pages processed** — as each page completes OCR
+    - **Saving OCR results: X/Y pages saved** — as results are written back
+    - **Bulk OCR executed successfully. Page statuses updated to not Proofread.** — when finished
+
+    If any saves fail, the notification shows the count of failures alongside successful saves.
+  </Step>
+</Steps>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="OCR feature" icon="scan" href="/features/ocr">
+    Learn about engine options, language selection, and Transkribus models
+  </Card>
+  <Card title="Bulk OCR feature" icon="layer-group" href="/features/bulk-ocr">
+    Understand how Bulk OCR finds and processes untranscribed pages
+  </Card>
+  <Card title="Book export" icon="book-open" href="/features/export">
+    See how WS Export generates EPUB, MOBI, and PDF files
+  </Card>
+  <Card title="Configuration" icon="gear" href="/configuration/settings">
+    View all configuration variables and their default values
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

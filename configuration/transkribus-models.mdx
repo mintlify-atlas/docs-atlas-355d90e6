@@ -1,0 +1,146 @@
+---
+title: "Transkribus models"
+description: "Configure per-wiki Transkribus HTR and line detection models for handwritten text recognition."
+---
+
+[Transkribus](https://readcoop.eu/transkribus/) is a platform for handwritten text recognition (HTR) developed by the READ-COOP cooperative. It specializes in historical manuscripts and documents where conventional OCR engines — which are optimized for printed text — perform poorly. The Wikisource extension integrates with Transkribus via the OCR service to allow transcription of handwritten source material.
+
+## Model types
+
+Transkribus uses two types of models:
+
+- **HTR models** recognize the text content of a handwritten or historical document. Each model is trained on a specific script, language, or time period. You must select at least one HTR model per wiki.
+- **Line detection models** identify the individual lines of text on a page before the HTR model reads them. Line detection is optional — if omitted, the OCR service uses its default line segmentation. A line model is specified by its numeric model ID.
+
+## Configuration structure
+
+Use `$wgWikisourceTranskribusModels` in `LocalSettings.php` to configure models on a per-wiki basis. The top-level keys are wiki database names (the value of `$wgDBname` for each wiki). Each entry contains an `htr` array of model name strings and an optional `line` integer model ID.
+
+```json
+{
+  "<wiki-db-name>": {
+    "htr": ["<model-name>", "..."],
+    "line": 12345
+  }
+}
+```
+
+Models listed in the `htr` array appear as selectable options in the OCR settings panel when a user chooses the Transkribus engine. The `line` value, when present, is automatically sent as the `line_id` parameter to the OCR API request.
+
+## Fetching and caching
+
+Available Transkribus languages and models are fetched from the OCR service at:
+
+```
+GET {$wgWikisourceOcrUrl}/api/available_langs?engine=transkribus
+```
+
+This request is made server-side when the `ext.wikisource.OCR` resource module is built. Results are stored in the MediaWiki WAN object cache under a global key and are valid for **one day** (`TTL_DAY`), with a stale serving window of **one week** (`TTL_WEEK`). If the OCR service is unreachable, the extension returns an empty array rather than failing hard.
+
+## Wiki model list
+
+The following wikis and models are configured by default in `extension.json`:
+
+<AccordionGroup>
+  <Accordion title="banwikisource — Balinese">
+    **HTR models:** `bali`
+
+    **Line detection model:** `45612`
+  </Accordion>
+  <Accordion title="bnwikisource — Bengali">
+    **HTR models:** `ben-print`, `dev`
+  </Accordion>
+  <Accordion title="cswikisource — Czech">
+    **HTR models:** `cs-space`, `cs-no-space`
+  </Accordion>
+  <Accordion title="dawikisource — Danish">
+    **HTR models:** `da-goth`, `da-goth-print`, `da-gjen`
+  </Accordion>
+  <Accordion title="dewikisource — German">
+    **HTR models:** `ger-hd-m1`, `ger-15`
+  </Accordion>
+  <Accordion title="elwikisource — Greek">
+    **HTR models:** `el-ligo`, `el-print`
+  </Accordion>
+  <Accordion title="enwikisource — English">
+    **HTR models:** `en-b2022`, `en-handwritten-m3`, `en-print-m1`, `en-typewriter`
+  </Accordion>
+  <Accordion title="eswikisource — Spanish">
+    **HTR models:** `es-md`, `es-redonda-extended-v1_2`
+  </Accordion>
+  <Accordion title="etwikisource — Estonian">
+    **HTR models:** `et-court`
+  </Accordion>
+  <Accordion title="fiwikisource — Finnish">
+    **HTR models:** `fin`
+  </Accordion>
+  <Accordion title="frwikisource — French">
+    **HTR models:** `fr-m1`
+  </Accordion>
+  <Accordion title="hewikisource — Hebrew">
+    **HTR models:** `he-dijest`
+  </Accordion>
+  <Accordion title="huwikisource — Hungarian">
+    **HTR models:** `hu-hand-19`
+  </Accordion>
+  <Accordion title="itwikisource — Italian">
+    **HTR models:** `it-hd-m1`
+  </Accordion>
+  <Accordion title="lawikisource — Latin">
+    **HTR models:** `la-caro`, `la-med`, `la-neo`
+  </Accordion>
+  <Accordion title="nlwikisource — Dutch">
+    **HTR models:** `de-17`, `nl-1605`, `nl-mount`, `nl-news`
+  </Accordion>
+  <Accordion title="nowikisource — Norwegian">
+    **HTR models:** `no-1820`, `no-1874`
+  </Accordion>
+  <Accordion title="plwikisource — Polish">
+    **HTR models:** `pl-m2`
+  </Accordion>
+  <Accordion title="ptwikisource — Portuguese">
+    **HTR models:** `pt-m1`, `pt-17`, `pt-hd`
+  </Accordion>
+  <Accordion title="rowikisource — Romanian">
+    **HTR models:** `ro-print`
+  </Accordion>
+  <Accordion title="ruwikisource — Russian">
+    **HTR models:** `rus-hd-2`, `rus-print`
+  </Accordion>
+  <Accordion title="sawikisource — Sanskrit">
+    **HTR models:** `san`
+  </Accordion>
+  <Accordion title="skwikisource — Slovak">
+    **HTR models:** `sk-hand`
+  </Accordion>
+  <Accordion title="slwikisource — Slovenian">
+    **HTR models:** `sl-hand-18`
+  </Accordion>
+  <Accordion title="svwikisource — Swedish">
+    **HTR models:** `swe-3`, `swe-lion-i`
+  </Accordion>
+  <Accordion title="ukwikisource — Ukrainian">
+    **HTR models:** `uk-20th-print`, `uk-generic-handwriting-1`, `uk-wikisource-print`
+  </Accordion>
+  <Accordion title="yiwikisource — Yiddish">
+    **HTR models:** `yi-hd`
+  </Accordion>
+</AccordionGroup>
+
+## Adding your own wiki
+
+To enable Transkribus for a wiki not listed above, add an entry to `$wgWikisourceTranskribusModels` in `LocalSettings.php`. Use the wiki's database name as the key and provide at least one HTR model name.
+
+```php
+$wgWikisourceTranskribusModels = [
+    // Add your wiki alongside the defaults, or replace this array entirely
+    'mywikisource' => [
+        'htr' => [ 'my-model-name' ],
+        'line' => 99999, // optional line detection model ID
+    ],
+];
+```
+
+<Note>
+  Model names must match identifiers recognized by the Transkribus API. Contact your OCR service operator or check the Transkribus platform for available model names for your language and script.
+</Note>

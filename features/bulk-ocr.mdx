@@ -1,0 +1,77 @@
+---
+title: "Bulk OCR"
+description: "Mass-transcribe all untranscribed pages in a ProofreadPage Index using the OCR service."
+keywords: ["bulk ocr", "mass transcription", "index", "proofreadpage", "sysop"]
+---
+
+<Warning>
+  Bulk OCR is under active development. Behavior may change and results should be verified before publishing.
+</Warning>
+
+Bulk OCR lets administrators automatically transcribe all untranscribed pages in a ProofreadPage `Index:` namespace article. When you click the **Bulk OCR** button, the extension fetches page images, runs OCR on them in batches, and saves the results as new page articles—without overwriting any page that already has content.
+
+## Requirements
+
+- You must be a member of the `sysop` user group.
+- `$wgWikisourceEnableBulkOcr` must be set to `true` (default: `false`).
+- `$wgWikisourceEnableOcr` must be set to `true` (default: `true`).
+- `$wgWikisourceOcrUrl` must point to a running OCR service.
+- The ProofreadPage extension must be installed.
+
+<Info>
+  The Bulk OCR module is only loaded for sysops viewing an `Index:` namespace page. It is not shown to non-admin users.
+</Info>
+
+## How it works
+
+Each `Index:` page can have one or more `<pagelist>` sections. A **Bulk OCR** button and an active-development warning appear above each `<pagelist>` section. When you click the button, the following steps run automatically:
+
+<Steps>
+  <Step title="Find untranscribed pages">
+    The extension queries the `proofreadpagesinindex` API list for all pages in the current Index. Pages with a `pageid` of `0` are uncreated (untranscribed) and are collected for processing. Pages that already exist are skipped entirely; the `createonly: 1` flag in the edit API call ensures no existing content is overwritten.
+  </Step>
+  <Step title="Fetch thumbnail images">
+    The extension queries the `imageforpage` property for every page in the Index (using the `proofreadpagesinindex` generator). Thumbnail URLs are collected for the untranscribed pages identified in the previous step.
+  </Step>
+  <Step title="Run OCR in batches of 10">
+    OCR requests are sent to `$wgWikisourceOcrUrl/api` in batches of 10 concurrent requests. The default engine is **Google** and the default language is `eng`. A 1-second delay is inserted between batches to avoid overloading the OCR service. A live progress notification shows how many pages have been processed out of the total.
+  </Step>
+  <Step title="Save results">
+    OCR results are saved using the MediaWiki Edit API (`action=edit`, `appendtext`, `createonly=1`). Saves also run in batches of 10 with a 1-second delay between batches. A live progress notification tracks how many pages have been saved and lists any pages that failed to save.
+  </Step>
+  <Step title="Update the page list display">
+    After all saves are complete, the extension live-updates the page list links on screen. Pages that were transcribed have their CSS class changed from `new` (red link) to `prp-pagequality-1 quality1` (not-proofread status) without requiring a full page reload.
+  </Step>
+</Steps>
+
+## Progress notifications
+
+Notifications appear in the MediaWiki notification area (`mw.notify`) throughout the process:
+
+| State | Type | Description |
+|---|---|---|
+| Fetching pages | `info` | Shown immediately on button click while the API query runs. |
+| OCR in progress | `info` | Updated live with a count of pages processed so far. |
+| Saving in progress | `info` | Updated live with a count of pages saved so far. |
+| No untranscribed pages | `error` | Shown if all pages in the Index already exist. |
+| Fetch pages failed | `error` | Shown if the `proofreadpagesinindex` API call fails. |
+| Fetch images failed | `error` | Shown if the `imageforpage` API call fails. |
+| Complete | `success` | Shown when all saves finish. Auto-hides after 30 seconds. |
+
+## Configuration
+
+| Variable | Default | Description |
+|---|---|---|
+| `$wgWikisourceEnableBulkOcr` | `false` | Enable the Bulk OCR feature. Must be set to `true` explicitly. |
+| `$wgWikisourceEnableOcr` | `true` | Master switch for OCR features. Bulk OCR requires this to also be `true`. |
+| `$wgWikisourceOcrUrl` | `https://ocr.wmcloud.org/` | Base URL of the OCR service used for both single-page and bulk OCR. |
+
+<Tip>
+  Because `$wgWikisourceEnableBulkOcr` defaults to `false`, you must explicitly opt in to this feature. This prevents accidental mass edits on wikis that have not tested it.
+</Tip>
+
+## Limitations
+
+- The default OCR engine for bulk processing is **Google** (not Tesseract). There is currently no UI to change the engine or language from the Index page.
+- Only uncreated pages (`pageid === 0`) are processed. Pages with any existing content, even empty pages, are skipped.
+- If an OCR request fails for a specific page, that page is silently skipped and the bulk process continues with the remaining pages.

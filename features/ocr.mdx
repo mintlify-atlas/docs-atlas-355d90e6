@@ -1,0 +1,95 @@
+---
+title: "OCR text extraction"
+description: "Automatically extract text from scanned page images in the ProofreadPage editor using Tesseract, Google Vision, or Transkribus."
+keywords: ["ocr", "text extraction", "tesseract", "google vision", "transkribus", "proofreadpage"]
+---
+
+The OCR feature adds an **Extract text** button to the WikiEditor toolbar when you edit a page in the ProofreadPage `Page:` namespace. Clicking it sends the scanned page image to an external OCR service and inserts the recognized text into the edit box.
+
+## Requirements
+
+- The WikiEditor beta toolbar must be enabled in your user preferences (the `usebetatoolbar` option).
+- The ProofreadPage extension must be installed and the page you are editing must use the `proofread-page` content model.
+- `$wgWikisourceEnableOcr` must be set to `true` (default).
+- `$wgWikisourceOcrUrl` must point to a running OCR service (default: `https://ocr.wmcloud.org/`).
+
+<Info>
+  The OCR module is only loaded on `Page:` namespace edit pages that meet all requirements above. It is not available on other namespaces or content models.
+</Info>
+
+## OCR engines
+
+The extension supports three OCR engines. You can switch between them using the settings popup next to the **Extract text** button.
+
+<CardGroup cols={3}>
+  <Card title="Tesseract" icon="file-lines">
+    Open-source OCR engine. This is the default engine. Supports a large number of languages selectable from a multi-select dropdown.
+  </Card>
+  <Card title="Google Vision" icon="eye">
+    Google Cloud Vision API. Provides high-accuracy OCR for printed text across many languages. Languages are selected from a multi-select dropdown.
+  </Card>
+  <Card title="Transkribus" icon="pen-nib">
+    Handwritten Text Recognition (HTR) engine from Transkribus. Designed for historical handwriting. You select a pre-trained model from a dropdown rather than a language. An optional line detection model can also be enabled via a checkbox.
+  </Card>
+</CardGroup>
+
+The list of available languages and models for each engine is fetched from the OCR service at `$wgWikisourceOcrUrl/api/available_langs?engine=<engine>` and cached for 24 hours (with a stale-while-revalidate period of one week).
+
+### Language and model selection
+
+- For **Tesseract** and **Google Vision**, a multi-select tag widget lets you choose one or more languages simultaneously.
+- For **Transkribus**, a single-select dropdown lets you choose one HTR model. If a wiki-specific line detection model is configured in `$wgWikisourceTranskribusModels`, an additional checkbox appears to enable it.
+
+## Using OCR
+
+<Steps>
+  <Step title="Open a Page namespace page for editing">
+    Navigate to any `Page:` namespace article and click **Edit**. The WikiEditor toolbar must be active.
+  </Step>
+  <Step title="Click the settings arrow (optional)">
+    Click the down-arrow indicator next to the **Extract text** button to open the settings popup. Select your preferred engine and language(s) or model. Your choices are saved automatically when the popup closes.
+  </Step>
+  <Step title="Click Extract text">
+    Click the **Extract text** button. The extension sends the current page image to the OCR service and replaces the content of the edit box with the recognized text.
+  </Step>
+  <Step title="Review and correct the result">
+    Review the OCR output in the edit box. If the result is not useful, click **Undo** to restore the previous text.
+  </Step>
+  <Step title="Save the page">
+    Make any corrections and save the page as normal.
+  </Step>
+</Steps>
+
+## Onboarding popup
+
+The first time you visit a `Page:` namespace edit page with OCR enabled, a pulsating dot appears next to the **Extract text** button. Clicking the dot (or the button itself) opens a popup that explains the feature. After you click **OK, got it**, the popup is dismissed permanently and will not appear again.
+
+## Undo
+
+After OCR runs successfully, an **Undo** panel slides into view. Clicking **Undo** calls `OcrTool.undo()`, which emits the `undoing` event with the previous text, restoring the edit box to its state before OCR ran.
+
+## Preferences persistence
+
+Your chosen engine and language(s) are persisted across sessions:
+
+- **Logged-in users** — settings are saved to MediaWiki user options (`wikisource-ocr`) via `mw.Api#saveOption`. The `localStorage` entry is removed to avoid conflict.
+- **Anonymous users** — settings are saved to `localStorage` under the key `wikisource-ocr`.
+
+On load, the extension first reads `mw.user.options` and falls back to `localStorage` for backward compatibility with the legacy storage format.
+
+## Configuration
+
+| Variable | Default | Description |
+|---|---|---|
+| `$wgWikisourceEnableOcr` | `true` | Enable or disable the OCR feature entirely. |
+| `$wgWikisourceOcrUrl` | `https://ocr.wmcloud.org/` | Base URL of the OCR service. Must be set when `$wgWikisourceEnableOcr` is `true`. |
+| `$wgWikisourceTranskribusModels` | *(per-wiki models)* | Map of database names to Transkribus HTR and line-detection model IDs. |
+| `$wgWikisourceHttpProxy` | `false` | HTTP proxy URL used when fetching language lists from the OCR service. |
+
+<Warning>
+  If `$wgWikisourceEnableOcr` is `true` but `$wgWikisourceOcrUrl` is not set, a `ConfigException` is thrown when a user opens a `Page:` namespace edit page.
+</Warning>
+
+## Advanced link
+
+The settings popup includes an **Advanced** link that opens the OCR tool's web UI directly in a new tab, pre-filled with the current image URL, engine, and language parameters. This is useful for debugging or for formats not supported by the in-editor widget.

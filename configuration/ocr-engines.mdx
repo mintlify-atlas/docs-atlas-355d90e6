@@ -1,0 +1,101 @@
+---
+title: "OCR engines"
+description: "Overview of the three OCR engines available in the Wikisource extension: Tesseract, Google Vision, and Transkribus."
+---
+
+The Wikisource extension supports three OCR engines. Each engine is suited to different types of source material. You can switch between engines in the OCR settings panel during page editing.
+
+<Tabs>
+  <Tab title="Tesseract">
+    ## Tesseract
+
+    [Tesseract](https://github.com/tesseract-ocr/tesseract) is an open-source OCR engine originally developed by HP and now maintained by Google. It is the **default engine** for single-page OCR in the ProofreadPage editor.
+
+    **Best for:** Printed text in a wide variety of languages.
+
+    **Language support:** Tesseract supports a large number of languages via language codes. The list of languages available on your OCR service is fetched dynamically at:
+
+    ```
+    GET {$wgWikisourceOcrUrl}/api/available_langs?engine=tesseract
+    ```
+
+    The result is cached in the MediaWiki WAN object cache for **one day**, with a stale serving window of **one week**. If the OCR service is unreachable, an empty list is returned.
+
+    **User config key:** `tesseract`
+  </Tab>
+  <Tab title="Google Vision">
+    ## Google Vision
+
+    Google Vision uses the [Google Cloud Vision API](https://cloud.google.com/vision) to perform OCR. It is the **default engine for Bulk OCR** and performs well across a wide range of printed scripts and languages.
+
+    **Best for:** Printed text, including scripts that Tesseract may handle less accurately.
+
+    **Language support:** Available languages are fetched at:
+
+    ```
+    GET {$wgWikisourceOcrUrl}/api/available_langs?engine=google
+    ```
+
+    The same caching rules apply as for Tesseract: results are cached for one day with a one-week stale TTL.
+
+    **User config key:** `google`
+
+    <Note>
+      Google Vision is accessed through the OCR service at `$wgWikisourceOcrUrl`. You do not need to configure a Google Cloud API key in `LocalSettings.php` — that is handled by the OCR service itself.
+    </Note>
+  </Tab>
+  <Tab title="Transkribus">
+    ## Transkribus
+
+    Transkribus is a handwritten text recognition (HTR) engine specialized for historical manuscripts and documents where printed-text OCR engines are ineffective. It requires per-wiki model configuration via [`$wgWikisourceTranskribusModels`](/configuration/transkribus-models).
+
+    **Best for:** Historical handwritten documents, old typewritten texts, and period-specific scripts.
+
+    **Model types:**
+
+    - **HTR models** recognize text content. Users select a model from the list configured for their wiki in `$wgWikisourceTranskribusModels`.
+    - **Line detection models** (optional) identify individual text lines before the HTR model reads them. When a `line` model ID is configured for a wiki, it is automatically included in OCR requests as `line_id`.
+
+    **Available models/languages are fetched at:**
+
+    ```
+    GET {$wgWikisourceOcrUrl}/api/available_langs?engine=transkribus
+    ```
+
+    Results are cached for one day with a one-week stale TTL.
+
+    **User config key:** `transkribus`
+
+    See [Transkribus models](/configuration/transkribus-models) for the full per-wiki model list and instructions on adding models for your wiki.
+  </Tab>
+</Tabs>
+
+## Language and model fetching
+
+All three engines retrieve their available languages and models from the OCR service at extension load time. The fetching logic is implemented in `EditPageShowEditFormInitialHandler::getLangsForEngine()`:
+
+1. A `GET` request is made to `{$wgWikisourceOcrUrl}/api/available_langs?engine=<engine>` for each engine.
+2. The response is stored in the MediaWiki WAN object cache under a global cache key (`wikisource-ocr-langs:<engine>`).
+3. Cached results are valid for **one day** (`TTL_DAY`). Stale results may be served for up to **one week** (`TTL_WEEK`) while a fresh fetch is triggered in the background.
+4. If the request fails or returns an empty response, the engine returns an empty array and no languages are shown for that engine.
+
+If you set `$wgWikisourceHttpProxy`, it is used for these requests.
+
+## User preference persistence
+
+The OCR engine selection and language choices are saved per user so they persist across editing sessions:
+
+- **Logged-in users:** Settings are saved as a MediaWiki user option under the key `wikisource-ocr` via `mw.Api().saveOption()`. Local storage is cleared when a user logs in.
+- **Anonymous users:** Settings are saved in browser `localStorage` under the key `wikisource-ocr`.
+
+In both cases the stored value is a JSON string with the following structure:
+
+```json
+{
+  "engine": "tesseract",
+  "langs": ["eng", "fra"],
+  "showOnboarding": true
+}
+```
+
+The `engine` field holds the engine key (`tesseract`, `google`, or `transkribus`). The `langs` array holds the selected language or model codes. The `showOnboarding` flag controls whether the introductory popup is shown to the user.
